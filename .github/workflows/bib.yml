@@ -33,6 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.PAT }}
           ref: ${{ github.head_ref }}
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -64,7 +65,7 @@ jobs:
           path: ./summary.log
       - name: Comment on pull request
         if: ${{ steps.auto-commit-action.outputs.changes_detected == 'true' }}
-        uses: peter-evans/create-or-update-comment@v1
+        uses: peter-evans/create-or-update-comment@v4
         with:
           issue-number: ${{ github.event.pull_request.number }}
           body: |

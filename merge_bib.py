@@ -126,14 +126,29 @@ def merge(base: Library, new: Entry):
 
 
 main_bib_file = (pathlib.Path(__file__).parent / "all.bib").resolve()
+
+if not main_bib_file.exists():
+    sys.stderr.write("Do not edit all.bib directly!\n")
+    sys.exit(-1)
+
 main_library = bibtexparser.parse_file(main_bib_file)
 main_keys = set(x.key for x in main_library.blocks)
+
+
+def check_all_bib():
+    for entry in main_library.entries:
+        if normalize_key(entry):
+            sys.stderr.write("Do not edit all.bib directly!\n")
+            sys.exit(-1)
+
 
 for arg in sys.argv[1:]:
     file = pathlib.Path(arg).resolve()
 
-    if file.suffix == ".bib":
-        if not file.exists() or file == main_bib_file:
+    if file == main_bib_file:
+        check_all_bib()
+    elif file.suffix == ".bib":
+        if not file.exists():
             continue
 
         logging.debug(f"Processing {file}...")
