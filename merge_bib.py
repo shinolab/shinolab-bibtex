@@ -133,13 +133,8 @@ for arg in sys.argv[1:]:
     file = pathlib.Path(arg).resolve()
 
     if file.suffix == ".bib":
-        if not file.exists():
-            sys.stderr.write("Do not remove bib files!\n")
-            sys.exit(-1)
-
-        if file == main_bib_file:
-            sys.stderr.write("Do not edit all.bib directly!\n")
-            sys.exit(-1)
+        if not file.exists() or file == main_bib_file:
+            continue
 
         logging.debug(f"Processing {file}...")
         added_library = bibtexparser.parse_file(file)
@@ -149,7 +144,7 @@ for arg in sys.argv[1:]:
             if new_entry:
                 merge(main_library, new_entry)
 
-    file.unlink()
+        file.unlink()
 
 
 with open(main_bib_file, mode="w", encoding="utf-8") as f:
