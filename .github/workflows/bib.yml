@@ -33,7 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.PAT }}
           ref: ${{ github.head_ref }}
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -57,6 +56,8 @@ jobs:
       - name: Commit changes
         id: auto-commit-action
         uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'Merged into all.bib'
       - name: Read summary.log
         if: ${{ steps.auto-commit-action.outputs.changes_detected == 'true' }}
         id: summary
