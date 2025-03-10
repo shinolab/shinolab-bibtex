@@ -47,6 +47,9 @@ jobs:
           python merge_bib.py ${ALL_CHANGED_FILES}
         env:
             ALL_CHANGED_FILES: ${{ needs.changed-files.outputs.bib_changed_files }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: latest
       - name: Format bibtex files
         run: |
           npm install -g bibtex-tidy
