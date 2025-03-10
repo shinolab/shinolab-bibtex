@@ -31,4 +31,4 @@ GitHubから行う場合は, [メインページ](https://github.com/shinolab/sh
   - フィールドを変更, 修正する必要がある場合は, 管理者に連絡してください.
 
 # Author
-Shun Suzuki, 2023-2025
+Shun Suzuki, 2025
