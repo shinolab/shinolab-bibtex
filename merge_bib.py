@@ -151,7 +151,7 @@ def normalize_field(entry: Entry) -> None:
     for key, field in entry.fields_dict.items():
         if key == "pages":
             pages = field.value
-            field.value = pages.replace("--", "-").replace("-", "--")
+            field.value = pages.replace("–", "-").replace("--", "-").replace("-", "--")
             entry.set_field(field)
 
 
