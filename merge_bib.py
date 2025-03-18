@@ -162,10 +162,11 @@ def merge(base: Library, new: Entry):
         new = merge_entry(entry, new)
         new_entry = format_entry(new)
         normalize_key(new)
-        diff = difflib.ndiff(base_entry.split("\n"), new_entry.split("\n"))
-        logging.info("=== UPDATE ===")
-        logging.info("\n".join(diff))
-        logging.info("==============")
+        diff = list(difflib.ndiff(base_entry.split("\n"), new_entry.split("\n")))
+        if any(x.startswith("- ") or x.startswith("+ ") for x in diff):
+            logging.info("=== UPDATE ===")
+            logging.info("\n".join(diff))
+            logging.info("==============")
         base.remove(entry)
     else:
         old_key = normalize_key(new)
