@@ -2,7 +2,6 @@ import difflib
 import logging
 import pathlib
 import sys
-from collections.abc import Callable
 
 import bibtexparser
 from bibtexparser import Library
@@ -11,21 +10,60 @@ from bibtexparser.model import Entry, Field
 logging.basicConfig(
     handlers=[logging.FileHandler(filename="summary.log", encoding="utf-8", mode="w")],
     format="%(message)s",
-    level=logging.INFO,
+    level=logging.DEBUG,
 )
 
 
+def norm_author_name(name: str) -> str:
+    if "," in name:
+        tokens = name.split(",")
+        if len(tokens) == 2:
+            return tokens[1].strip() + " " + tokens[0].strip()
+        elif len(tokens) == 3:
+            return tokens[2].strip() + " " + tokens[0].strip() + " " + tokens[1].strip()
+        else:
+            sys.stderr.write(f"WARN: Invalid author name: {name}\n")
+            return name.lower()
+    else:
+        return name.lower()
+
+
+def compare_field(a: Field, b: Field) -> bool:
+    if a.key != b.key:
+        return False
+
+    a_value = a.value.strip()
+    b_value = b.value.strip()
+    match a.key:
+        case "title":
+            return a_value.lower().replace("{", "").replace(
+                "}", ""
+            ) == b_value.lower().replace("{", "").replace("}", "")
+        case "pages":
+            return a_value.replace("--", "-") == b_value.replace("--", "-")
+        case "author":
+            a_authors = a_value.lower().split(" and ")
+            b_authors = b_value.lower().split(" and ")
+            if len(a_authors) != len(b_authors):
+                return False
+            return all(
+                norm_author_name(a_author) == norm_author_name(b_author)
+                for a_author, b_author in zip(a_authors, b_authors)
+            )
+        case _:
+            return a.value == b.value
+
+
 def is_same_entry(a: Entry, b: Entry):
-    def compare_field(key: str, compare: Callable[[Field, Field], bool] | None = None):
-        compare_fn = compare or (lambda a, b: a.value == b.value)
+    def comp(key: str):
         a_field = a.fields_dict.get(key)
         b_field = b.fields_dict.get(key)
-        return a_field and b_field and compare_fn(a_field, b_field)
+        return a_field and b_field and compare_field(a_field, b_field)
 
-    if compare_field("doi"):
+    if comp("doi"):
         return True
 
-    if compare_field("title", lambda a, b: a.value.lower() == b.value.lower()):
+    if comp("title"):
         return True
 
     return False
@@ -87,49 +125,12 @@ def normalize_key(entry: Entry) -> str | None:
         return None
 
 
-def norm_author_name(name: str) -> str:
-    if "," in name:
-        tokens = name.split(",")
-        if len(tokens) == 2:
-            return tokens[1].strip() + " " + tokens[0].strip()
-        elif len(tokens) == 3:
-            return tokens[2].strip() + " " + tokens[0].strip() + " " + tokens[1].strip()
-        else:
-            sys.stderr.write(f"WARN: Invalid author name: {name}\n")
-            return name.lower()
-    else:
-        return name.lower()
-
-
 def merge_entry(base: Entry, new: Entry) -> list[Field]:
     for key, field in new.fields_dict.items():
         if key in base.fields_dict:
             base_field = base.fields_dict[key]
 
-            def comp_field(a: Field, b: Field) -> bool:
-                if a.key != b.key:
-                    return False
-
-                a_value = a.value.strip()
-                b_value = b.value.strip()
-                match a.key:
-                    case "title":
-                        return a_value.lower() != b_value.lower()
-                    case "pages":
-                        return a_value.replace("--", "-") != b_value.replace("--", "-")
-                    case "author":
-                        a_authors = a_value.lower().split(" and ")
-                        b_authors = b_value.lower().split(" and ")
-                        if len(a_authors) != len(b_authors):
-                            return False
-                        return any(
-                            norm_author_name(a_author) != norm_author_name(b_author)
-                            for a_author, b_author in zip(a_authors, b_authors)
-                        )
-                    case _:
-                        return a.value != b.value
-
-            if comp_field(base_field, field):
+            if not compare_field(base_field, field):
                 sys.stderr.write(
                     f"Conflicting field {key}: {base_field.value} vs {field.value}\n"
                 )
@@ -170,7 +171,9 @@ if not main_bib_file.exists():
     sys.exit(-1)
 
 main_library = bibtexparser.parse_file(main_bib_file)
-main_keys = set(x.key for x in main_library.blocks)
+main_keys = set(
+    x.key for x in filter(lambda x: hasattr(x, "key"), main_library.entries)
+)
 
 
 def check_all_bib():
@@ -191,7 +194,9 @@ for arg in sys.argv[1:]:
 
         logging.debug(f"Processing {file}...")
         added_library = bibtexparser.parse_file(file)
-        added_keys = set(x.key for x in added_library.blocks)
+        added_keys = set(
+            x.key for x in filter(lambda x: hasattr(x, "key"), added_library.entries)
+        )
         for diff in added_keys.difference(main_keys):
             new_entry = added_library.entries_dict[diff]
             if new_entry:
