@@ -87,11 +87,49 @@ def normalize_key(entry: Entry) -> str | None:
         return None
 
 
+def norm_author_name(name: str) -> str:
+    if "," in name:
+        tokens = name.split(",")
+        if len(tokens) == 2:
+            return tokens[1].strip() + " " + tokens[0].strip()
+        elif len(tokens) == 3:
+            return tokens[2].strip() + " " + tokens[0].strip() + " " + tokens[1].strip()
+        else:
+            sys.stderr.write(f"WARN: Invalid author name: {name}\n")
+            return name.lower()
+    else:
+        return name.lower()
+
+
 def merge_entry(base: Entry, new: Entry) -> list[Field]:
     for key, field in new.fields_dict.items():
         if key in base.fields_dict:
             base_field = base.fields_dict[key]
-            if base_field.value != field.value:
+
+            def comp_field(a: Field, b: Field) -> bool:
+                if a.key != b.key:
+                    return False
+
+                a_value = a.value.strip()
+                b_value = b.value.strip()
+                match a.key:
+                    case "title":
+                        return a_value.lower() != b_value.lower()
+                    case "pages":
+                        return a_value.replace("--", "-") != b_value.replace("--", "-")
+                    case "author":
+                        a_authors = a_value.lower().split(" and ")
+                        b_authors = b_value.lower().split(" and ")
+                        if len(a_authors) != len(b_authors):
+                            return False
+                        return any(
+                            norm_author_name(a_author) != norm_author_name(b_author)
+                            for a_author, b_author in zip(a_authors, b_authors)
+                        )
+                    case _:
+                        return a.value != b.value
+
+            if comp_field(base_field, field):
                 sys.stderr.write(
                     f"Conflicting field {key}: {base_field.value} vs {field.value}\n"
                 )
