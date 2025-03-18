@@ -2,6 +2,7 @@ import difflib
 import logging
 import pathlib
 import sys
+from datetime import datetime
 
 import bibtexparser
 from bibtexparser import Library
@@ -10,7 +11,7 @@ from bibtexparser.model import Entry, Field
 logging.basicConfig(
     handlers=[logging.FileHandler(filename="summary.log", encoding="utf-8", mode="w")],
     format="%(message)s",
-    level=logging.DEBUG,
+    level=logging.INFO,
 )
 
 
@@ -41,9 +42,13 @@ def compare_field(a: Field, b: Field) -> bool:
             ) == b_value.lower().replace("{", "").replace("}", "")
         case "pages":
             return a_value.replace("--", "-") == b_value.replace("--", "-")
-        case "author":
-            a_authors = a_value.lower().split(" and ")
-            b_authors = b_value.lower().split(" and ")
+        case "author" | "editor":
+            a_authors = (
+                a_value.lower().replace("\r", "").replace("\n", " ").split(" and ")
+            )
+            b_authors = (
+                b_value.lower().replace("\r", "").replace("\n", " ").split(" and ")
+            )
             if len(a_authors) != len(b_authors):
                 return False
             return all(
@@ -142,6 +147,14 @@ def merge_entry(base: Entry, new: Entry) -> list[Field]:
     return base
 
 
+def normalize_field(entry: Entry) -> None:
+    for key, field in entry.fields_dict.items():
+        if key == "pages":
+            pages = field.value
+            field.value = pages.replace("--", "-").replace("-", "--")
+            entry.set_field(field)
+
+
 def merge(base: Library, new: Entry):
     entry = has_same_entry(base, new)
     if entry:
@@ -161,6 +174,7 @@ def merge(base: Library, new: Entry):
         logging.info("\n".join((" " * 2 + x for x in added.split("\n"))))
         logging.info("==============")
     new.pop("urldate")
+    normalize_field(new)
     base.add(new)
 
 
@@ -192,6 +206,9 @@ for arg in sys.argv[1:]:
         if not file.exists():
             continue
 
+        if file.parent == pathlib.Path(__file__).parent / "bak":
+            continue
+
         logging.debug(f"Processing {file}...")
         added_library = bibtexparser.parse_file(file)
         added_keys = set(
@@ -202,6 +219,13 @@ for arg in sys.argv[1:]:
             if new_entry:
                 merge(main_library, new_entry)
 
+        (pathlib.Path(__file__).parent / "bak").mkdir(exist_ok=True)
+        file.rename(
+            pathlib.Path(__file__).parent
+            / "bak"
+            / (datetime.now().strftime("%Y%m%d-%H%M%S-") + file.name)
+        )
+    else:
         file.unlink()
 
 
